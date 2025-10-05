@@ -42,7 +42,7 @@ def user_lock(user_id: int) -> asyncio.Lock:
 @dataclass
 class QA:
     question: str
-    answers: List[str]  # допустимые строки в НИЖНЕМ регистре (цифры тоже ок)
+    answers: List[str]  # допустимые строки (нижний регистр)
 
 QUESTIONS: List[QA] = [
     QA("Какой сейчас год?", ["2025"]),
@@ -57,9 +57,9 @@ INTERMEDIATE_SECRET = "238141264816"   # после него отправляе�
 FINAL_SECRET = "hello from moscow"     # после него отправляем видео
 
 class Flow(StatesGroup):
-    quiz = State()          # этап вопросов
-    waiting_code = State()  # ждём "238141264816"
-    riddle = State()        # прислан "Ребус", особая логика ответов
+    quiz = State()           # этап вопросов
+    waiting_code = State()   # ждём "238141264816" (и даём подсказочные ответы на другие вводы)
+    waiting_final = State()  # после "Ребус": ждём "hello from moscow"
 
 def norm(s: str) -> str:
     s = s.strip().lower()
@@ -102,7 +102,7 @@ async def on_quiz_answer(m: Message, state: FSMContext):
         if norm(m.text) in qa.answers:
             idx += 1
             if idx >= len(QUESTIONS):
-                # Все 5 ответов верны → отправляем кодовое сообщение и ждём фразу 238141264816
+                # Все 5 ответов верны → отправляем код и переходим к ожиданию кодовой фразы
                 await m.answer(FINAL_CODE_MESSAGE)
                 await state.set_state(Flow.waiting_code)
             else:
@@ -115,43 +115,44 @@ async def on_quiz_answer(m: Message, state: FSMContext):
 @router.message(Flow.waiting_code, F.text)
 async def on_waiting_code(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
-        if norm(m.text) == INTERMEDIATE_SECRET:
+        txt_raw = m.text
+        txt = norm(txt_raw)
+
+        # 1) Корректный код → "Ребус" и переход к финальному этапу
+        if txt == INTERMEDIATE_SECRET:
             await m.answer("Ребус")
-            await state.set_state(Flow.riddle)
-        else:
-            await m.answer("Код неверный")
-
-@router.message(Flow.waiting_code)
-async def on_waiting_code_non_text(m: Message):
-    await m.answer("Код неверный")
-
-@router.message(Flow.riddle, F.text)
-async def on_riddle(m: Message, state: FSMContext):
-    async with user_lock(m.from_user.id):
-        txt = m.text.strip()
-
-        # Финальная фраза — сразу видео
-        if norm(txt) == FINAL_SECRET:
-            await send_video(m)
-            await state.clear()
+            await state.set_state(Flow.waiting_final)
             return
 
-        # Только 1 и 0 (без пробелов/знаков)
-        if re.fullmatch(r"[01]+", txt):
+        # 2) Только 1 и 0 (без разделителей) → спец-ответ
+        if re.fullmatch(r"[01]+", txt_raw.strip()):
             await m.answer("Вот ты понимаешь что это за числа, вот и я нет, давай ка подумай хорошенько")
             return
 
-        # Только цифры/пробелы/точки/тире → не тот формат
-        if re.fullmatch(r"[0-9\s\.\-]+", txt):
+        # 3) Числа, разделённые пробелом/точкой/тире (любое кол-во разделителей) → «не тот формат»
+        if re.fullmatch(r"\s*\d+(?:[.\-\s]+\d+)+\s*", txt_raw):
             await m.answer("Ответ не в том формате")
             return
 
-        # Остальное
+        # 4) Иное → «достал уже»
         await m.answer("Что тебе еще надо, достал уже")
 
-@router.message(Flow.riddle)
-async def on_riddle_non_text(m: Message):
+@router.message(Flow.waiting_code)
+async def on_waiting_code_non_text(m: Message):
     await m.answer("Что тебе еще надо, достал уже")
+
+@router.message(Flow.waiting_final, F.text)
+async def on_waiting_final(m: Message, state: FSMContext):
+    async with user_lock(m.from_user.id):
+        if norm(m.text) == FINAL_SECRET:
+            await send_video(m)
+            await state.clear()
+        else:
+            await m.answer("Мне это не интересно")
+
+@router.message(Flow.waiting_final)
+async def on_waiting_final_non_text(m: Message):
+    await m.answer("Мне это не интересно")
 
 # Fallback — только вне любого состояния
 @router.message(StateFilter(None))
