@@ -63,13 +63,24 @@ QUESTIONS: List[QA] = [
 ]
 
 FINAL_CODE_MESSAGE = "Вот твой код от замка 3412"
-INTERMEDIATE_SECRET = "238141264816"   # после него отправляем "Ребус"
-FINAL_SECRET = "The Heavenly Feast"     # после него отправляем видео
+INTERMEDIATE_SECRET = "238141264816"   # после него отправляем текст загадки
+FINAL_SECRET = "The Heavenly Feast"    # после него отправляем видео
+
+# Текст загадки (с сохранением опечатки "eplorers" как в исходных требованиях)
+PUZZLE_TEXT = (
+    "The ****** *******\n"
+    "Надо восстановить фразу, как видишь не хватает двух слов.\n"
+    "Расшифруй их, и отправь мне полный текст.\n"
+    "Всё что тебе необходимо это первая буква каждого слова.\n"
+    "Второе слово было случайно подбито геошифровкой, но я думаю ты разберешься.\n"
+    "The honest eplorers ascend vast emerald niches leaving yesterdays "
+    "srb103 gcvwr3 swbbh1 r3gx2f xn76up"
+)
 
 class Flow(StatesGroup):
     quiz = State()           # этап вопросов
     waiting_code = State()   # ждём "238141264816" (с вариативными ответами на неверный ввод)
-    waiting_final = State()  # после "Ребус": ждём "hello from moscow"
+    waiting_final = State()  # после отправки загадки: ждём финальную фразу
 
 def norm(s: str) -> str:
     s = s.strip().lower()
@@ -127,16 +138,9 @@ async def on_waiting_code(m: Message, state: FSMContext):
         txt_raw = m.text            # исходный ввод (regex смотрят в «как есть»)
         txt = norm(txt_raw)         # нормализованный для точного сравнения кода
 
-        # 1) Корректный код → "Ребус" и переход к финальному этапу
+        # 1) Корректный код → отправляем загадку и переходим к финальному этапу
         if txt == INTERMEDIATE_SECRET:
-            await m.answer("
-The ****** *******
-Надо восстановить фразу, как видишь не хватает двух слов. 
-Расшифруй их, и отправь мне полный текст. 
-Всё что тебе необходимо это первая буква каждого слова. 
-Второе слово было случайно подбито геошифровкой, но я думаю ты разберешься. 
-The honest eplorers ascend vast emerald niches leaving yesterdays srb103 gcvwr3 swbbh1 r3gx2f xn76up
-			")
+            await m.answer(PUZZLE_TEXT)
             await state.set_state(Flow.waiting_final)
             return
 
