@@ -22,7 +22,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN не задан.")
 
-PUBLIC_URL = os.getenv("https://anonymous-iwu0.onrender.com")  # например: https://your-service.onrender.com
+PUBLIC_URL = os.getenv("PUBLIC_URL")  # например: https://your-service.onrender.com
 if not PUBLIC_URL:
     raise RuntimeError("PUBLIC_URL не задан. Пропиши URL сервиса Render в переменных окружения.")
 
