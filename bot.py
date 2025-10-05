@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List
 
-from aiohttp import web  # мини-вебсервер для Render (keep-alive)
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -19,11 +18,10 @@ logging.basicConfig(level=logging.INFO)
 # ---------- Переменные окружения ----------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    # Для локального теста можно временно вписать токен сюда строкой
-    raise RuntimeError("BOT_TOKEN не задан. Укажи токен бота в переменных окружения.")
+    raise RuntimeError("BOT_TOKEN не задан. Укажи токен бота в переменных окружения или впиши его в код.")
 
-VIDEO_URL = os.getenv("VIDEO_URL")                     # опционально: прямая https-ссылка на mp4
-VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")      # локальный файл в репозитории
+VIDEO_URL = os.getenv("VIDEO_URL")                 # опционально: прямая https-ссылка на mp4
+VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")  # локальный файл рядом с bot.py
 
 # ---------- Инициализация ----------
 bot = Bot(BOT_TOKEN)
@@ -44,7 +42,7 @@ def user_lock(user_id: int) -> asyncio.Lock:
 @dataclass
 class QA:
     question: str
-    answers: List[str]  # допустимые строки в НИЖНЕМ регистре
+    answers: List[str]  # допустимые строки в НИЖНЕМ регистре (цифры тоже ок)
 
 QUESTIONS: List[QA] = [
     QA("Какой сейчас год?", ["2025"]),
@@ -55,13 +53,13 @@ QUESTIONS: List[QA] = [
 ]
 
 FINAL_CODE_MESSAGE = "Вот твой код от замка 3412"
-INTERMEDIATE_SECRET = "238141264816"        # после него отправляем "Ребус"
-FINAL_SECRET = "hello from moscow"          # после него отправляем видео
+INTERMEDIATE_SECRET = "238141264816"   # после него отправляем "Ребус"
+FINAL_SECRET = "hello from moscow"     # после него отправляем видео
 
 class Flow(StatesGroup):
-    quiz = State()              # этап вопросов
-    waiting_code = State()      # ждём "238141264816"
-    riddle = State()            # прислан "Ребус", обрабатываем особые ответы
+    quiz = State()          # этап вопросов
+    waiting_code = State()  # ждём "238141264816"
+    riddle = State()        # прислан "Ребус", особая логика ответов
 
 def norm(s: str) -> str:
     s = s.strip().lower()
@@ -90,8 +88,8 @@ async def on_start(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
         await state.clear()
         await state.update_data(idx=0)
-        await m.answer("Давай поиграем в игру")
-        await m.answer(QUESTIONS[0].question)
+        await m.answer("Давай поиграем в игру")          # 1-е сообщение
+        await m.answer(QUESTIONS[0].question)            # 2-е сообщение: "Какой сейчас год?"
         await state.set_state(Flow.quiz)
 
 @router.message(Flow.quiz, F.text)
@@ -104,7 +102,7 @@ async def on_quiz_answer(m: Message, state: FSMContext):
         if norm(m.text) in qa.answers:
             idx += 1
             if idx >= len(QUESTIONS):
-                # Все 5 ответов верны -> отправляем кодовое сообщение и переходим к ожиданию фразы "238141264816"
+                # Все 5 ответов верны → отправляем кодовое сообщение и ждём фразу 238141264816
                 await m.answer(FINAL_CODE_MESSAGE)
                 await state.set_state(Flow.waiting_code)
             else:
@@ -118,7 +116,6 @@ async def on_quiz_answer(m: Message, state: FSMContext):
 async def on_waiting_code(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
         if norm(m.text) == INTERMEDIATE_SECRET:
-            # Верная кодовая фраза -> шлём "Ребус" и переходим в этап ребуса
             await m.answer("Ребус")
             await state.set_state(Flow.riddle)
         else:
@@ -133,23 +130,23 @@ async def on_riddle(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
         txt = m.text.strip()
 
-        # Сначала проверяем финальную кодовую фразу — она должна переводить к видео
+        # Финальная фраза — сразу видео
         if norm(txt) == FINAL_SECRET:
             await send_video(m)
             await state.clear()
             return
 
-        # 1) Только из 1 и 0 (без пробелов и знаков)
+        # Только 1 и 0 (без пробелов/знаков)
         if re.fullmatch(r"[01]+", txt):
             await m.answer("Вот ты понимаешь что это за числа, вот и я нет, давай ка подумай хорошенько")
             return
 
-        # 2) Если строка состоит ТОЛЬКО из цифр, пробелов, точек или тире (любой комбинации) — «не тот формат»
+        # Только цифры/пробелы/точки/тире → не тот формат
         if re.fullmatch(r"[0-9\s\.\-]+", txt):
             await m.answer("Ответ не в том формате")
             return
 
-        # 3) Любой другой ввод
+        # Остальное
         await m.answer("Что тебе еще надо, достал уже")
 
 @router.message(Flow.riddle)
@@ -161,31 +158,11 @@ async def on_riddle_non_text(m: Message):
 async def fallback(m: Message):
     await m.answer("Набери /start чтобы начать игру заново.")
 
-# ---------- Запуск: polling + мини-вебсервер (для Render) ----------
-async def run_polling():
-    await bot.delete_webhook(drop_pending_updates=True)  # если раньше стоял webhook
-    await dp.start_polling(bot)
-
-async def healthz(_request):
-    return web.Response(text="ok")
-
-async def run_web():
-    app = web.Application()
-    app.router.add_get("/", healthz)
-    app.router.add_get("/healthz", healthz)
-
-    port = int(os.getenv("PORT", "10000"))  # Render прокидывает порт сюда
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info(f"Health server started on :{port}")
-
-    while True:
-        await asyncio.sleep(3600)
-
+# ---------- Запуск только POLLING ----------
 async def main():
-    await asyncio.gather(run_web(), run_polling())
+    # снимаем webhook, если был, чтобы не ловить 409
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
