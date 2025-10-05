@@ -64,7 +64,7 @@ QUESTIONS: List[QA] = [
 
 FINAL_CODE_MESSAGE = "Вот твой код от замка 3412"
 INTERMEDIATE_SECRET = "238141264816"   # после него отправляем "Ребус"
-FINAL_SECRET = "hello from moscow"     # после него отправляем видео
+FINAL_SECRET = "The Heavenly Feast"     # после него отправляем видео
 
 class Flow(StatesGroup):
     quiz = State()           # этап вопросов
@@ -129,7 +129,14 @@ async def on_waiting_code(m: Message, state: FSMContext):
 
         # 1) Корректный код → "Ребус" и переход к финальному этапу
         if txt == INTERMEDIATE_SECRET:
-            await m.answer("Ребус")
+            await m.answer("
+The ****** *******
+Надо восстановить фразу, как видишь не хватает двух слов. 
+Расшифруй их, и отправь мне полный текст. 
+Всё что тебе необходимо это первая буква каждого слова. 
+Второе слово было случайно подбито геошифровкой, но я думаю ты разберешься. 
+The honest eplorers ascend vast emerald niches leaving yesterdays srb103 gcvwr3 swbbh1 r3gx2f xn76up
+			")
             await state.set_state(Flow.waiting_final)
             return
 
