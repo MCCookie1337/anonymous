@@ -169,7 +169,8 @@ async def on_waiting_code_non_text(m: Message):
 @router.message(Flow.waiting_final, F.text)
 async def on_waiting_final(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
-        if norm(m.text) == FINAL_SECRET:
+        # СРАВНИВАЕМ НОРМАЛИЗОВАННЫЕ СТРОКИ (исправление)
+        if norm(m.text) == norm(FINAL_SECRET):
             await send_video(m)
             await state.clear()
         else:
