@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List
 
+from aiohttp import web  # мини-вебсервер (Render требует открытый порт)
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -18,10 +19,10 @@ logging.basicConfig(level=logging.INFO)
 # ----------------- Конфиг -----------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN не задан. Укажи токен бота в переменных окружения или впиши его в код.")
+    raise RuntimeError("BOT_TOKEN не задан. Укажи токен бота в переменных окружения.")
 
-VIDEO_URL = os.getenv("VIDEO_URL")                 # опционально: прямая https-ссылка на mp4
-VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")  # локальный файл рядом с bot.py
+VIDEO_URL = os.getenv("VIDEO_URL")                  # опционально: прямая https-ссылка на mp4
+VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")   # локальный файл рядом с bot.py
 
 # ----------------- Инициализация -----------------
 bot = Bot(BOT_TOKEN)
@@ -29,7 +30,7 @@ dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 dp.include_router(router)
 
-# Последовательная обработка сообщений пользователя (без «проскоков»)
+# Последовательная обработка сообщений пользователя (гасим «проскоки»)
 _locks: Dict[int, asyncio.Lock] = {}
 def user_lock(user_id: int) -> asyncio.Lock:
     lock = _locks.get(user_id)
@@ -58,7 +59,7 @@ FINAL_SECRET = "hello from moscow"     # после него отправляе�
 
 class Flow(StatesGroup):
     quiz = State()           # этап вопросов
-    waiting_code = State()   # ждём "238141264816" с особыми ответами на «не тот» ввод
+    waiting_code = State()   # ждём "238141264816" (с вариативными ответами на неверный ввод)
     waiting_final = State()  # после "Ребус": ждём "hello from moscow"
 
 def norm(s: str) -> str:
@@ -68,10 +69,12 @@ def norm(s: str) -> str:
 
 # ----------------- Утилиты -----------------
 async def send_video(m: Message):
-    if VIDEO_URL:  # по ссылке
+    # 1) Если задана ссылка — шлём URL
+    if VIDEO_URL:
         await m.answer_video(VIDEO_URL)
         return
-    path = pathlib.Path(VIDEO_PATH).resolve()  # локальный файл
+    # 2) Иначе берём локальный файл
+    path = pathlib.Path(VIDEO_PATH).resolve()
     if not path.exists() or not path.is_file():
         await m.answer(f"Видео не найдено: {path.name}. Добавь файл рядом с bot.py или задай VIDEO_URL.")
         return
@@ -112,32 +115,35 @@ async def on_quiz_answer(m: Message, state: FSMContext):
 @router.message(Flow.waiting_code, F.text)
 async def on_waiting_code(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
-        txt_raw = m.text  # исходная строка
-        txt = norm(txt_raw)
+        txt_raw = m.text            # исходный ввод (сохраняем как есть для regex)
+        txt = norm(txt_raw)         # нормализованный (для точного сравнения кода)
 
-        # 1) Корректный код → "Ребус" и переход к финальному этапу
+        # 1) Корректный код → "Ребус" и переходим к финальному этапу
         if txt == INTERMEDIATE_SECRET:
             await m.answer("Ребус")
             await state.set_state(Flow.waiting_final)
             return
 
-        # 2) Строка состоит ТОЛЬКО из 1 и 0 (без разделителей)
+        # 2) Только 1 и 0 (без разделителей)
         if re.fullmatch(r"[01]+", txt_raw.strip()):
             await m.answer("Вот ты понимаешь что это за числа, вот и я нет, давай ка подумай хорошенько")
             return
 
-        # 3) Строка состоит из чисел, разделённых пробелом/точкой/тире (микс разрешён)
-        #    Примеры: "12 34", "12-34-56", "1.0.1", "10 - 11 . 12"
-        if re.fullmatch(r"\s*\d+(?:[.\-\s]+\d+)+\s*", txt_raw):
+        # 3) Только цифры (но НЕ правильный код)
+        if re.fullmatch(r"\d+", txt_raw.strip()):
+            await m.answer("Ты по-моему что-то перепутал")
+            return
+
+        # 4) Цифры + пробелы/точки/тире (любой микс этих символов)
+        if re.fullmatch(r"[0-9\s.\-]+", txt_raw.strip()):
             await m.answer("Ответ не в том формате")
             return
 
-        # 4) Всё остальное
+        # 5) Иное
         await m.answer("Что тебе еще надо, достал уже")
 
 @router.message(Flow.waiting_code)
 async def on_waiting_code_non_text(m: Message):
-    # Нечитаемые типы на этом шаге считаем «остальным вводом»
     await m.answer("Что тебе еще надо, достал уже")
 
 @router.message(Flow.waiting_final, F.text)
@@ -158,10 +164,32 @@ async def on_waiting_final_non_text(m: Message):
 async def fallback(m: Message):
     await m.answer("Набери /start чтобы начать игру заново.")
 
-# ----------------- Запуск POLLING -----------------
-async def main():
-    await bot.delete_webhook(drop_pending_updates=True)  # на всякий случай
+# ----------------- Запуск: Web + Polling -----------------
+async def run_polling():
+    # Снимем webhook, если вдруг был, чтобы polling не падал на 409
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
+
+async def healthz(_req):
+    return web.Response(text="ok")
+
+async def run_web():
+    app = web.Application()
+    app.router.add_get("/", healthz)
+    app.router.add_get("/healthz", healthz)
+
+    port = int(os.getenv("PORT", "10000"))  # Render передаёт порт сюда
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    logging.info(f"Health server started on :{port}")
+
+    while True:
+        await asyncio.sleep(3600)
+
+async def main():
+    await asyncio.gather(run_web(), run_polling())
 
 if __name__ == "__main__":
     asyncio.run(main())
