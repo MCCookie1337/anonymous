@@ -6,20 +6,29 @@ import re
 from dataclasses import dataclass
 from typing import Dict, List
 
-from aiohttp import web  # мини-вебсервер (Render требует открытый порт)
+from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Message, FSInputFile
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 
 logging.basicConfig(level=logging.INFO)
 
 # ----------------- Конфиг -----------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN не задан. Укажи токен бота в переменных окружения.")
+    raise RuntimeError("BOT_TOKEN не задан.")
+
+PUBLIC_URL = os.getenv("PUBLIC_URL")  # например: https://your-service.onrender.com
+if not PUBLIC_URL:
+    raise RuntimeError("PUBLIC_URL не задан. Пропиши URL сервиса Render в переменных окружения.")
+
+# Безопаснее держать путь вебхука «секретным»
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"   # можно заменить на свой секрет
+WEBHOOK_URL = PUBLIC_URL.rstrip("/") + WEBHOOK_PATH
 
 VIDEO_URL = os.getenv("VIDEO_URL")                  # опционально: прямая https-ссылка на mp4
 VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")   # локальный файл рядом с bot.py
@@ -115,10 +124,10 @@ async def on_quiz_answer(m: Message, state: FSMContext):
 @router.message(Flow.waiting_code, F.text)
 async def on_waiting_code(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
-        txt_raw = m.text            # исходный ввод (сохраняем как есть для regex)
-        txt = norm(txt_raw)         # нормализованный (для точного сравнения кода)
+        txt_raw = m.text            # исходный ввод (regex смотрят в «как есть»)
+        txt = norm(txt_raw)         # нормализованный для точного сравнения кода
 
-        # 1) Корректный код → "Ребус" и переходим к финальному этапу
+        # 1) Корректный код → "Ребус" и переход к финальному этапу
         if txt == INTERMEDIATE_SECRET:
             await m.answer("Ребус")
             await state.set_state(Flow.waiting_final)
@@ -164,32 +173,31 @@ async def on_waiting_final_non_text(m: Message):
 async def fallback(m: Message):
     await m.answer("Набери /start чтобы начать игру заново.")
 
-# ----------------- Запуск: Web + Polling -----------------
-async def run_polling():
-    # Снимем webhook, если вдруг был, чтобы polling не падал на 409
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+# ----------------- Webhook-сервер -----------------
+async def on_startup(app: web.Application):
+    # Ставим вебхук на свой URL; удаляем возможные старые апдейты
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+    logging.info(f"Webhook set to: {WEBHOOK_URL}")
 
-async def healthz(_req):
-    return web.Response(text="ok")
+async def on_shutdown(app: web.Application):
+    # По желанию можно снимать вебхук на остановке:
+    # await bot.delete_webhook()
+    pass
 
-async def run_web():
+def create_app() -> web.Application:
     app = web.Application()
+    # health-check/ручка главной
+    async def healthz(_req): return web.Response(text="ok")
     app.router.add_get("/", healthz)
     app.router.add_get("/healthz", healthz)
 
-    port = int(os.getenv("PORT", "10000"))  # Render передаёт порт сюда
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", port)
-    await site.start()
-    logging.info(f"Health server started on :{port}")
+    # Регистрируем обработчик апдейтов Telegram
+    SimpleRequestHandler(dp, bot).register(app, path=WEBHOOK_PATH)
 
-    while True:
-        await asyncio.sleep(3600)
-
-async def main():
-    await asyncio.gather(run_web(), run_polling())
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+    return app
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    port = int(os.getenv("PORT", "10000"))
+    web.run_app(create_app(), host="0.0.0.0", port=port)
