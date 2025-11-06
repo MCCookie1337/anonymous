@@ -31,7 +31,7 @@ WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"   # можно заменить на св
 WEBHOOK_URL = PUBLIC_URL.rstrip("/") + WEBHOOK_PATH
 
 VIDEO_URL = os.getenv("VIDEO_URL")                  # опционально: прямая https-ссылка на mp4
-VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")   # локальный файл рядом с bot.py
+VIDEO_PATH = os.getenv("VIDEO_PATH", "xxx.mp4")   # локальный файл рядом с bot.py
 
 # ----------------- Инициализация -----------------
 bot = Bot(BOT_TOKEN)
@@ -115,7 +115,7 @@ async def send_video(m: Message):
     # Отправляем без перекодировки, как документ (оригинал)
     await m.answer_document(
         FSInputFile(VIDEO_PATH),
-        caption="🎬 Вот оригинальный файл видео (не сжатый Telegram)"
+        caption="хммммм, похоже это финал"
     )
     
     await m.answer_video(FSInputFile(path))
