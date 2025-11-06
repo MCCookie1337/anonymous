@@ -110,10 +110,17 @@ async def send_video(m: Message):
         await m.answer_video(VIDEO_URL)
         return
     # 2) Иначе берём локальный файл
-    path = pathlib.Path(VIDEO_PATH).resolve()
-    if not path.exists() or not path.is_file():
-        await m.answer(f"Видео не найдено: {path.name}. Добавь файл рядом с bot.py или задай VIDEO_URL.")
-        return
+    #path = pathlib.Path(VIDEO_PATH).resolve()
+    #if not path.exists() or not path.is_file():
+    #    await m.answer(f"Видео не найдено: {path.name}. Добавь файл рядом с bot.py или задай VIDEO_URL.")
+    #    return
+
+    # Отправляем без перекодировки, как документ (оригинал)
+    await m.answer_document(
+        FSInputFile(path),
+        caption="🎬 Вот оригинальный файл видео (не сжатый Telegram)"
+    )
+    
     await m.answer_video(FSInputFile(path))
 
 async def send_question(m: Message, idx: int):
