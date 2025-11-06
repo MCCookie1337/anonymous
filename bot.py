@@ -39,7 +39,14 @@ bot = Bot(BOT_TOKEN)
 from aiogram.fsm.storage.redis import RedisStorage
 import os
 
+# Получаем URL Redis из переменной окружения Render
 REDIS_URL = os.getenv("REDIS_URL")
+
+# Если Render дал короткий адрес (без схемы redis://), добавляем её
+if REDIS_URL and not REDIS_URL.startswith(("redis://", "rediss://")):
+    REDIS_URL = f"redis://{REDIS_URL}"
+
+# Инициализируем хранилище FSM через Redis
 dp = Dispatcher(storage=RedisStorage.from_url(REDIS_URL))
 
 router = Router()
