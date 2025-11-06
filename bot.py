@@ -117,7 +117,7 @@ async def send_video(m: Message):
 
     # Отправляем без перекодировки, как документ (оригинал)
     await m.answer_document(
-        FSInputFile(path),
+        FSInputFile(video.mp4),
         caption="🎬 Вот оригинальный файл видео (не сжатый Telegram)"
     )
     
