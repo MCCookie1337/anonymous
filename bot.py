@@ -105,10 +105,7 @@ def norm(s: str) -> str:
 
 # ----------------- Утилиты -----------------
 async def send_video(m: Message):
-    # 1) Если задана ссылка — шлём URL
-    if VIDEO_URL:
-        await m.answer_video(VIDEO_URL)
-        return
+
     # 2) Иначе берём локальный файл
     #path = pathlib.Path(VIDEO_PATH).resolve()
     #if not path.exists() or not path.is_file():
@@ -117,7 +114,7 @@ async def send_video(m: Message):
 
     # Отправляем без перекодировки, как документ (оригинал)
     await m.answer_document(
-        FSInputFile(video.mp4),
+        FSInputFile(VIDEO_PATH),
         caption="🎬 Вот оригинальный файл видео (не сжатый Telegram)"
     )
     
