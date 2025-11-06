@@ -35,7 +35,13 @@ VIDEO_PATH = os.getenv("VIDEO_PATH", "video.mp4")   # локальный фай�
 
 # ----------------- Инициализация -----------------
 bot = Bot(BOT_TOKEN)
-dp = Dispatcher(storage=MemoryStorage())
+
+from aiogram.fsm.storage.redis import RedisStorage
+import os
+
+REDIS_URL = os.getenv("REDIS_URL")
+dp = Dispatcher(storage=RedisStorage.from_url(REDIS_URL))
+
 router = Router()
 dp.include_router(router)
 
