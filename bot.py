@@ -144,7 +144,8 @@ async def send_question(m: Message, idx: int):
 
 @router.message(F.document)
 async def get_file_id_document(m: Message):
-    await m.answer(f"📄 file_id PDF:\n\n`{m.document.file_id}`", parse_mode="Markdown")
+    print("📄 FILE_ID:", m.document.file_id)
+    await m.answer(f"📄 file_id PDF:\n\n`{m.document.file_id}`")
 
 #PDF_ID = "ВАШ_FILE_ID_PDF"   # ← вставь сюда file_id PDF
 
