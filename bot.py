@@ -105,11 +105,9 @@ def norm(s: str) -> str:
 
 # ----------------- Утилиты -----------------
 async def send_video(m: Message):
-    await m.answer(
-        "хммммм, похоже это финал 🎬\n\n"
-        "🎥 [Смотреть видео](https://www.dropbox.com/scl/fi/4vokqqjio98yfk75xaidt/xxx.mp4?rlkey=13di0cxzzsgt7glmapwm70adk&st=r0mdhqvd&dl=0)",
-        parse_mode="Markdown"
-    )
+    FILE_ID = "BAACAgIAAxkBAAIHBWkPAyfB_oyZ_SL5mv2YA2hLh3s4AALIggACn3GASAug1aepNIQ6NgQ"
+    await m.answer_video(FILE_ID, caption="хммммм, похоже это финал 🎬")
+
 
 
     #except Exception as e:
