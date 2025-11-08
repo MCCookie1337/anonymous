@@ -151,7 +151,18 @@ PDF_ID = "BQACAgIAAxkBAAIHM2kPEGKRTO4mcwMD_eFPzMlbn7FSAAKbgwACn3GASBQyLLv7aGrFNg
 
 @router.message(Flow.waiting_pdf, F.text.lower() == "получить")
 async def send_pdf(m: Message, state: FSMContext):
-    await m.answer_document(PDF_ID, caption="📄")
+    hidden_text = (
+        '<span class="tg-spoiler">✨✨✨✨✨✨✨</span>\n'
+        '<span class="tg-spoiler">✨Happy birthday!✨</span>\n'
+        '<span class="tg-spoiler">✨✨✨✨✨✨✨</span>'
+    )
+
+    await m.answer_document(
+        PDF_ID,
+        caption=hidden_text,
+        parse_mode="HTML"
+    )
+
     await state.clear()
 
 
