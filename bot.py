@@ -106,7 +106,7 @@ def norm(s: str) -> str:
 # ----------------- Утилиты -----------------
 async def send_video(m: Message):
     # Прямая ссылка на Google Drive
-    VIDEO_URL = "https://drive.google.com/uc?export=download&id=1OvLsDFYmPxLS_snWK4X9NQQgxFGfArGj"
+    VIDEO_URL = "https://github.com/MCCookie1337/anonymous/blob/main/xxx.mp4"
 
     try:
         await m.answer_video(
