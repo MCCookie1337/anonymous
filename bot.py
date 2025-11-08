@@ -118,7 +118,7 @@ async def send_video(m: Message):
         caption="хммммм, похоже это финал"
     )
     
-    await m.answer_video(FSInputFile(path))
+    await m.answer_video(FSInputFile(VIDEO_PATH))
 
 async def send_question(m: Message, idx: int):
     await m.answer(QUESTIONS[idx].question)
