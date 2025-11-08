@@ -106,28 +106,28 @@ def norm(s: str) -> str:
 # ----------------- Утилиты -----------------
 async def send_video(m: Message):
     # Прямая ссылка на Google Drive
-    VIDEO_URL = "https://github.com/MCCookie1337/anonymous/blob/main/xxx.mp4"
-
-    try:
-        await m.answer_video(
-            VIDEO_URL,
-            caption="хммммм, похоже это финал 🎬"
-        )
-    except Exception as e:
-        await m.answer(f"Не удалось отправить видео: {e}")
-
-
+    #VIDEO_URL = "https://github.com/MCCookie1337/anonymous/blob/main/xxx.mp4"
+#
+ #   try:
+#        await m.answer_video(
+ #           VIDEO_URL,
+  #          caption="хммммм, похоже это финал 🎬"
+   #     )
+    #except Exception as e:
+ #       await m.answer(f"Не удалось отправить видео: {e}")
+#
+#
     # 2) Иначе берём локальный файл
     #path = pathlib.Path(VIDEO_PATH).resolve()
     #if not path.exists() or not path.is_file():
     #    await m.answer(f"Видео не найдено: {path.name}. Добавь файл рядом с bot.py или задай VIDEO_URL.")
     #    return
 
-    # Отправляем без перекодировки, как документ (оригинал)
-    #await m.answer_document(
-    #    FSInputFile(VIDEO_PATH),
-    #    caption="хммммм, похоже это финал"
-    #)
+     Отправляем без перекодировки, как документ (оригинал)
+    await m.answer_document(
+        FSInputFile(VIDEO_PATH),
+        caption="хммммм, похоже это финал 🎬"
+    )
     
     #await m.answer_video(FSInputFile(VIDEO_PATH))
 
