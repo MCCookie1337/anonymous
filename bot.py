@@ -97,6 +97,7 @@ class Flow(StatesGroup):
     quiz = State()           # этап вопросов
     waiting_code = State()   # ждём "238141264816" (с вариативными ответами на неверный ввод)
     waiting_final = State()  # после отправки загадки: ждём финальную фразу
+    waiting_pdf = State()      # ← новое состояние
 
 def norm(s: str) -> str:
     s = s.strip().lower()
@@ -104,9 +105,11 @@ def norm(s: str) -> str:
     return s
 
 # ----------------- Утилиты -----------------
-async def send_video(m: Message):
-    FILE_ID = "BAACAgIAAxkBAAIHBWkPAyfB_oyZ_SL5mv2YA2hLh3s4AALIggACn3GASAug1aepNIQ6NgQ"
+async def send_video(m: Message, state: FSMContext):
+    FILE_ID = "BAACAgIAAxkBAAIHIGkPCLIY4mAhdUKZPqUDAcxsAoz7AAI_gwACn3GASKbZ3kKuv-25NgQ"
     await m.answer_video(FILE_ID, caption="хммммм, похоже это финал 🎬")
+
+    await state.set_state(Flow.waiting_pdf)
 
 
 
@@ -137,6 +140,19 @@ async def send_question(m: Message, idx: int):
 async def get_file_id(m: Message):
     print("📹 FILE_ID:", m.video.file_id)
     await m.answer(f"Вот file_id этого видео:\n\n{m.video.file_id}")
+
+
+@router.message(F.document)
+async def get_file_id_document(m: Message):
+    await m.answer(f"📄 file_id PDF:\n\n`{m.document.file_id}`", parse_mode="Markdown")
+
+PDF_ID = "ВАШ_FILE_ID_PDF"   # ← вставь сюда file_id PDF
+
+@router.message(Flow.waiting_pdf, F.text.lower() == "получить")
+async def send_pdf(m: Message, state: FSMContext):
+    await m.answer_document(PDF_ID, caption="📄")
+    await state.clear()
+
 
 
 
@@ -222,8 +238,7 @@ async def on_waiting_final(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
         # СРАВНИВАЕМ НОРМАЛИЗОВАННЫЕ СТРОКИ (исправление)
         if norm(m.text) == norm(FINAL_SECRET):
-            await send_video(m)
-            await state.clear()
+            await send_video(m, state)
         else:
             await m.answer("Мне это не интересно")
 
