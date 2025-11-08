@@ -134,6 +134,14 @@ async def send_question(m: Message, idx: int):
     await m.answer(QUESTIONS[idx].question)
 
 # ----------------- Хэндлеры -----------------
+
+@router.message(F.video)
+async def get_file_id(m: Message):
+    print("📹 FILE_ID:", m.video.file_id)
+    await m.answer(f"Вот file_id этого видео:\n\n{m.video.file_id}")
+
+
+
 @router.message(CommandStart())
 async def on_start(m: Message, state: FSMContext):
     async with user_lock(m.from_user.id):
