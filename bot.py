@@ -142,24 +142,16 @@ async def send_question(m: Message, idx: int):
 #    await m.answer(f"Вот file_id этого видео:\n\n{m.video.file_id}")
 
 
-from aiogram.filters import StateFilter
-
-@router.message(StateFilter("*"), F.document)
+@router.message(F.document)
 async def get_file_id_document(m: Message):
-    await m.answer(
-        f"📄 file_id PDF:\n\n`{m.document.file_id}`",
-        parse_mode="Markdown"
-    )
-
-
     await m.answer(f"📄 file_id PDF:\n\n`{m.document.file_id}`", parse_mode="Markdown")
 
-PDF_ID = "ВАШ_FILE_ID_PDF"   # ← вставь сюда file_id PDF
+#PDF_ID = "ВАШ_FILE_ID_PDF"   # ← вставь сюда file_id PDF
 
-@router.message(Flow.waiting_pdf, F.text.lower() == "получить")
-async def send_pdf(m: Message, state: FSMContext):
-    await m.answer_document(PDF_ID, caption="📄")
-    await state.clear()
+#@router.message(Flow.waiting_pdf, F.text.lower() == "получить")
+#async def send_pdf(m: Message, state: FSMContext):
+#    await m.answer_document(PDF_ID, caption="📄")
+#    await state.clear()
 
 
 
